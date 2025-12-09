@@ -23,10 +23,6 @@ struct ContentView: View {
                 Text("CanvasWidget Settings")
                     .font(.title)
                     .fontWeight(.semibold)
-
-                Text("Configure Python interpreter path")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
             }
             .padding(.top)
 
@@ -35,17 +31,6 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Python Interpreter Path")
                         .font(.headline)
-
-                    if !settings.pythonInterpreterPath.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(URL(fileURLWithPath: settings.pythonInterpreterPath).lastPathComponent)
-                                .fontWeight(.medium)
-                            Text(settings.pythonInterpreterPath)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
 
                     HStack {
                         TextField("Enter Python interpreter path", text: $manualPathInput)
@@ -91,6 +76,7 @@ struct ContentView: View {
             HStack {
                 Button("Cancel") {
                     settings.discardChanges()
+                    manualPathInput = settings.pythonInterpreterPath
                 }
                 .disabled(!settings.hasChanges)
                 .controlSize(.large)
@@ -112,6 +98,9 @@ struct ContentView: View {
             Button("OK") { }
         } message: {
             Text("The selected path is invalid. Please select a valid Python 3 interpreter.")
+        }
+        .onAppear {
+            manualPathInput = settings.pythonInterpreterPath
         }
     }
 
@@ -180,7 +169,6 @@ struct ContentView: View {
 
         let url = URL(fileURLWithPath: manualPathInput)
         validatePythonPath(url)
-        manualPathInput = "" // Clear the text field after validation
     }
 }
 
