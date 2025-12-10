@@ -16,10 +16,19 @@ struct Announcement: Identifiable {
     let link: URL
 }
 
+struct Assignment: Identifiable {
+    let id = UUID()
+    let course: String
+    let title: String
+    let dueDate: String
+    let link: URL
+}
+
 struct SimpleEntry: TimelineEntry {
     let date: Date
     let configuration: ConfigurationAppIntent
     let announcements: [Announcement]
+    let assignments: [Assignment]
 }
 
 func sampleAnnouncements() -> [Announcement] {
@@ -63,12 +72,36 @@ func sampleAnnouncements() -> [Announcement] {
     ]
 }
 
+func sampleAssignments() -> [Assignment] {
+    return [
+        Assignment(
+            course: "EN.580.680.01.FA25",
+            title: "Assignment Created - Teammate Evaluation Form, Precision Care Medicine",
+            dueDate: "Dec 15 by 9pm",
+            link: URL(string: "https://jhu.instructure.com/courses/102501/announcements/1142916")!
+        ),
+        Assignment(
+            course: "CS 101",
+            title: "Homework 1",
+            dueDate: "Dec 12 by 11:59pm",
+            link: URL(string: "https://canvas.example.com/courses/1/assignments/101")!
+        ),
+        Assignment(
+            course: "Math 205",
+            title: "Problem Set 3",
+            dueDate: "Dec 14 by 5pm",
+            link: URL(string: "https://canvas.example.com/courses/2/assignments/201")!
+        )
+    ]
+}
+
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
         SimpleEntry(
             date: Date(),
             configuration: ConfigurationAppIntent(),
-            announcements: sampleAnnouncements()
+            announcements: sampleAnnouncements(),
+            assignments: sampleAssignments()
         )
     }
     
@@ -76,7 +109,8 @@ struct Provider: AppIntentTimelineProvider {
         SimpleEntry(
             date: Date(),
             configuration: configuration,
-            announcements: sampleAnnouncements()
+            announcements: sampleAnnouncements(),
+            assignments: sampleAssignments()
         )
     }
     
@@ -86,7 +120,8 @@ struct Provider: AppIntentTimelineProvider {
         let entry = SimpleEntry(
             date: now,
             configuration: configuration,
-            announcements: sampleAnnouncements()
+            announcements: sampleAnnouncements(),
+            assignments: sampleAssignments()
         )
         
         let nextRefreshDate = Calendar.current.date(byAdding: .minute, value: 15, to: now)!
@@ -98,9 +133,9 @@ struct WidgetExtensionEntryView: View {
     var entry: Provider.Entry
     @Environment(\.widgetFamily) var family
 
-    // MARK: - Size-Specific Configuration
+    // MARK: - Size Configuration
 
-    var maxAnnouncements: Int {
+    var maxItems: Int {
         switch family {
         case .systemSmall:
             return 2
@@ -157,28 +192,51 @@ struct WidgetExtensionEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: headerSpacing) {
             // Header
-            Text("Announcements")
+            Text(headerTitle)
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundStyle(.primary)
 
             // Content
-            if entry.announcements.isEmpty {
-                emptyStateView
-            } else {
-                announcementsListView
-            }
+            contentView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(contentPadding)
     }
+    
+    var headerTitle: String {
+        switch entry.configuration.contentType {
+        case .announcements:
+            return "Announcements"
+        case .assignments:
+            return "Assignments"
+        }
+    }
+
+    @ViewBuilder
+    var contentView: some View {
+        switch entry.configuration.contentType {
+        case .announcements:
+            if entry.announcements.isEmpty {
+                emptyStateView(text: "No announcements")
+            } else {
+                announcementsListView
+            }
+        case .assignments:
+            if entry.assignments.isEmpty {
+                emptyStateView(text: "No assignments")
+            } else {
+                assignmentsListView
+            }
+        }
+    }
 
     // MARK: - Subviews
 
-    private var emptyStateView: some View {
+    private func emptyStateView(text: String) -> some View {
         VStack {
             Spacer()
-            Text("No announcements")
+            Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -189,10 +247,23 @@ struct WidgetExtensionEntryView: View {
 
     private var announcementsListView: some View {
         VStack(alignment: .leading, spacing: itemSpacing) {
-            ForEach(Array(entry.announcements.prefix(maxAnnouncements))) { announcement in
+            ForEach(Array(entry.announcements.prefix(maxItems))) { announcement in
                 announcementRow(for: announcement)
 
-                if announcement.id != entry.announcements.prefix(maxAnnouncements).last?.id {
+                if announcement.id != entry.announcements.prefix(maxItems).last?.id {
+                    Divider()
+                        .padding(.vertical, 1)
+                }
+            }
+        }
+    }
+    
+    private var assignmentsListView: some View {
+        VStack(alignment: .leading, spacing: itemSpacing) {
+            ForEach(Array(entry.assignments.prefix(maxItems))) { assignment in
+                assignmentRow(for: assignment)
+
+                if assignment.id != entry.assignments.prefix(maxItems).last?.id {
                     Divider()
                         .padding(.vertical, 1)
                 }
@@ -217,6 +288,33 @@ struct WidgetExtensionEntryView: View {
                     Spacer()
 
                     Text(announcement.date)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func assignmentRow(for assignment: Assignment) -> some View {
+        Link(destination: assignment.link) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(assignment.title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                HStack(spacing: 8) {
+                    Text(assignment.course)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Text(assignment.dueDate)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
