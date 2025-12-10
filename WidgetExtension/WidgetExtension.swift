@@ -115,6 +115,15 @@ struct Provider: AppIntentTimelineProvider {
     }
     
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
+        // Read settings from Shared App Group
+        let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget")
+        let pythonPath = defaults?.string(forKey: "PythonInterpreterPath") ?? "Not set"
+        let sessionId = defaults?.string(forKey: "SessionID") ?? "Not set"
+        
+        print("WidgetExtension Settings:")
+        print("PythonInterpreterPath: \(pythonPath)")
+        print("SessionID: \(sessionId)")
+
         // Generate a single timeline entry for the current date.
         let now = Date()
         let entry = SimpleEntry(

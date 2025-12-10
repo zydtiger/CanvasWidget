@@ -13,7 +13,8 @@ class SettingsModel: ObservableObject {
     @Published var sessionId: String
     @Published var hasChanges: Bool = false
     
-    private let defaults = UserDefaults.standard
+    // Use a shared App Group container
+    private let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget") ?? .standard
     private let pythonPathKey = "PythonInterpreterPath"
     private let sessionIdKey = "SessionID"
     private let defaultPythonPath = "/usr/bin/python3"
