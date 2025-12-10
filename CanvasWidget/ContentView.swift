@@ -11,7 +11,7 @@ struct ContentView: View {
     @StateObject private var settings = SettingsModel()
     @State private var showingInvalidPathAlert = false
     @State private var manualPathInput = ""
-
+    
     var body: some View {
         VStack(spacing: 24) {
             // Header
@@ -19,24 +19,24 @@ struct ContentView: View {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.secondary)
-
+                
                 Text("CanvasWidget Settings")
                     .font(.title)
                     .fontWeight(.semibold)
             }
             .padding(.top)
-
+            
             // Settings content
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Python Interpreter Path")
                         .font(.headline)
-
+                    
                     HStack {
                         TextField("Enter Python interpreter path", text: $manualPathInput)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(.body, design: .monospaced))
-
+                        
                         Button("Validate") {
                             validateManualPath()
                         }
@@ -44,12 +44,12 @@ struct ContentView: View {
                         .controlSize(.regular)
                     }
                 }
-
+                
                 // Session ID section
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Session ID")
                         .font(.headline)
-
+                    
                     TextField("Enter Session ID", text: Binding(
                         get: { settings.sessionId },
                         set: { settings.updateSessionId($0) }
@@ -57,7 +57,7 @@ struct ContentView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                 }
-
+                
                 if settings.hasChanges {
                     HStack {
                         Image(systemName: "info.circle")
@@ -69,9 +69,9 @@ struct ContentView: View {
                     }
                 }
             }
-
+            
             Spacer()
-
+            
             // Buttons
             HStack {
                 Button("Cancel") {
@@ -80,9 +80,9 @@ struct ContentView: View {
                 }
                 .disabled(!settings.hasChanges)
                 .controlSize(.large)
-
+                
                 Spacer()
-
+                
                 Button("Save") {
                     settings.saveSettings()
                 }
@@ -103,10 +103,10 @@ struct ContentView: View {
             manualPathInput = settings.pythonInterpreterPath
         }
     }
-
+    
     private func validatePythonPath(_ url: URL) {
         let path = url.path
-
+        
         // Check if the file is executable
         guard FileManager.default.isExecutableFile(atPath: path) else {
             print("Selected file is not executable")
@@ -116,23 +116,23 @@ struct ContentView: View {
             }
             return
         }
-
+        
         // Run the executable with --version flag to validate it's Python 3
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = ["--version"]
-
+        
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
-
+        
         do {
             try process.run()
             process.waitUntilExit()
-
+            
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
-
+            
             if process.terminationStatus == 0 {
                 if output.lowercased().contains("python 3") {
                     settings.updatePythonPath(path)
@@ -163,10 +163,10 @@ struct ContentView: View {
             }
         }
     }
-
+    
     private func validateManualPath() {
         guard !manualPathInput.isEmpty else { return }
-
+        
         let url = URL(fileURLWithPath: manualPathInput)
         validatePythonPath(url)
     }
