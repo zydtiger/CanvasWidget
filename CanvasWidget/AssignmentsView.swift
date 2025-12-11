@@ -10,6 +10,8 @@ import SwiftUI
 struct AssignmentsView: View {
     @StateObject private var provider = Provider.shared
     @State private var assignments = sampleAssignments()
+    @State private var showingLinkAlert = false
+    @State private var linkToOpen: URL?
     
     var body: some View {
         ZStack {
@@ -119,7 +121,18 @@ struct AssignmentsView: View {
         .padding(.vertical, 8)
         .contentShape(Rectangle())
         .onTapGesture {
-            print("Tapped assignment: \(assignment.title)")
+            linkToOpen = assignment.link
+            showingLinkAlert = true
+        }
+        .alert("Open in Browser?", isPresented: $showingLinkAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Open") {
+                if let link = linkToOpen {
+                    NSWorkspace.shared.open(link)
+                }
+            }
+        } message: {
+            Text("Do you want to open this link in your default browser?")
         }
     }
 }

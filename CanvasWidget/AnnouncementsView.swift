@@ -11,6 +11,8 @@ import AppKit
 struct AnnouncementsView: View {
     @StateObject private var provider = Provider.shared
     @State private var announcements = sampleAnnouncements()
+    @State private var showingLinkAlert = false
+    @State private var linkToOpen: URL?
     
     var body: some View {
         ZStack{
@@ -120,7 +122,18 @@ struct AnnouncementsView: View {
         .padding(.vertical, 8)
         .contentShape(Rectangle())
         .onTapGesture {
-            print("Tapped announcement: \(announcement.title)")
+            linkToOpen = announcement.link
+            showingLinkAlert = true
+        }
+        .alert("Open in Browser?", isPresented: $showingLinkAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Open") {
+                if let link = linkToOpen {
+                    NSWorkspace.shared.open(link)
+                }
+            }
+        } message: {
+            Text("Do you want to open this link in your default browser?")
         }
     }
 }
