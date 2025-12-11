@@ -63,9 +63,10 @@ class Provider: ObservableObject {
 
             // Parse JSON response
             let decodedAnnouncements = try JSONDecoder().decode([Announcement].self, from: data)
-            self.announcements = decodedAnnouncements
-            saveAnnouncementsToCache(decodedAnnouncements)
-            print("Successfully fetched \(decodedAnnouncements.count) announcements")
+            let uniqueAnnouncements = deduplicateAnnouncements(decodedAnnouncements)
+            self.announcements = uniqueAnnouncements
+            saveAnnouncementsToCache(uniqueAnnouncements)
+            print("Successfully fetched \(decodedAnnouncements.count) announcements (\(uniqueAnnouncements.count) unique)")
 
         } catch {
             isLoadingAnnouncements = false
@@ -113,9 +114,10 @@ class Provider: ObservableObject {
 
             // Parse JSON response
             let decodedAssignments = try JSONDecoder().decode([Assignment].self, from: data)
-            self.assignments = decodedAssignments
-            saveAssignmentsToCache(decodedAssignments)
-            print("Successfully fetched \(decodedAssignments.count) assignments")
+            let uniqueAssignments = deduplicateAssignments(decodedAssignments)
+            self.assignments = uniqueAssignments
+            saveAssignmentsToCache(uniqueAssignments)
+            print("Successfully fetched \(decodedAssignments.count) assignments (\(uniqueAssignments.count) unique)")
 
         } catch {
             isLoadingAssignments = false
@@ -177,5 +179,49 @@ class Provider: ObservableObject {
         } catch {
             print("Error encoding assignments for cache: \(error)")
         }
+    }
+
+    // MARK: - Deduplication Methods
+
+    private func deduplicateAnnouncements(_ announcements: [Announcement]) -> [Announcement] {
+        var seenIDs = Set<String>()
+        var uniqueAnnouncements: [Announcement] = []
+        var duplicatesRemoved = 0
+
+        for announcement in announcements {
+            if !seenIDs.contains(announcement.id) {
+                seenIDs.insert(announcement.id)
+                uniqueAnnouncements.append(announcement)
+            } else {
+                duplicatesRemoved += 1
+            }
+        }
+
+        if duplicatesRemoved > 0 {
+            print("Removed \(duplicatesRemoved) duplicate announcements")
+        }
+
+        return uniqueAnnouncements
+    }
+
+    private func deduplicateAssignments(_ assignments: [Assignment]) -> [Assignment] {
+        var seenIDs = Set<String>()
+        var uniqueAssignments: [Assignment] = []
+        var duplicatesRemoved = 0
+
+        for assignment in assignments {
+            if !seenIDs.contains(assignment.id) {
+                seenIDs.insert(assignment.id)
+                uniqueAssignments.append(assignment)
+            } else {
+                duplicatesRemoved += 1
+            }
+        }
+
+        if duplicatesRemoved > 0 {
+            print("Removed \(duplicatesRemoved) duplicate assignments")
+        }
+
+        return uniqueAssignments
     }
 }
