@@ -13,5 +13,6 @@ struct CanvasWidgetApp: App {
         WindowGroup {
             EntryView()
         }
+        .defaultSize(width: 800, height: 600)
     }
 }
