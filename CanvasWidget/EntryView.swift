@@ -48,14 +48,19 @@ struct EntryView: View {
     private var settingsView: some View {
         VStack(spacing: 24) {
             // Header
-            VStack(spacing: 8) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 48))
+            VStack(spacing: 16) {
+                Image(systemName: "gear")
+                    .font(.system(size: 32))
                     .foregroundColor(.secondary)
                 
                 Text("CanvasWidget Settings")
                     .font(.title)
                     .fontWeight(.semibold)
+
+                Text("Change connection settings here")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
             .padding(.top)
             
