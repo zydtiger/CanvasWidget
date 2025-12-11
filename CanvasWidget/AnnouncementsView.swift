@@ -10,7 +10,6 @@ import AppKit
 
 struct AnnouncementsView: View {
     @StateObject private var provider = Provider.shared
-    @State private var announcements = sampleAnnouncements()
     @State private var showingLinkAlert = false
     @State private var linkToOpen: URL?
     
@@ -58,7 +57,7 @@ struct AnnouncementsView: View {
                 // List
                 ScrollView {
                     LazyVStack(spacing: 6) {
-                        let currentAnnouncements = provider.announcements.isEmpty ? announcements : provider.announcements
+                        let currentAnnouncements = provider.announcements.isEmpty ? sampleAnnouncements() : provider.announcements
                         ForEach(currentAnnouncements) { announcement in
                             announcementRow(for: announcement)
                             

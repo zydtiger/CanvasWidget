@@ -9,7 +9,6 @@ import SwiftUI
 
 struct AssignmentsView: View {
     @StateObject private var provider = Provider.shared
-    @State private var assignments = sampleAssignments()
     @State private var showingLinkAlert = false
     @State private var linkToOpen: URL?
     
@@ -57,7 +56,7 @@ struct AssignmentsView: View {
                 // List
                 ScrollView {
                     LazyVStack(spacing: 6) {
-                        let currentAssignments = provider.assignments.isEmpty ? assignments : provider.assignments
+                        let currentAssignments = provider.assignments.isEmpty ? sampleAssignments() : provider.assignments
                         ForEach(currentAssignments) { assignment in
                             assignmentRow(for: assignment)
                             
