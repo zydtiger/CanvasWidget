@@ -5,8 +5,8 @@
 //  Created by Claude on 12/10/25.
 //
 
-import Foundation
 import Combine
+import Foundation
 
 @MainActor
 class Provider: ObservableObject {
@@ -16,6 +16,7 @@ class Provider: ObservableObject {
     @Published var assignments: [Assignment] = []
     @Published var isLoadingAnnouncements = false
     @Published var isLoadingAssignments = false
+    @Published var errorMessage: String?
 
     private let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget") ?? .standard
     private let announcementsKey = "CachedAnnouncements"
@@ -27,22 +28,24 @@ class Provider: ObservableObject {
 
     func fetchAnnouncements() async {
         isLoadingAnnouncements = true
+        errorMessage = nil
 
         // Get settings from UserDefaults
         let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget") ?? .standard
         guard let scraperAPIUrl = defaults.string(forKey: "ScraperAPIUrl"),
-              let sessionId = defaults.string(forKey: "SessionID"),
-              !scraperAPIUrl.isEmpty,
-              !sessionId.isEmpty else {
+            let sessionId = defaults.string(forKey: "SessionID"),
+            !scraperAPIUrl.isEmpty,
+            !sessionId.isEmpty
+        else {
             isLoadingAnnouncements = false
-            print("Missing scraper API URL or session ID")
+            errorMessage = "Missing scraper API URL or session ID in settings"
             return
         }
 
         // Create URL
         guard let url = URL(string: "\(scraperAPIUrl)/announcements") else {
             isLoadingAnnouncements = false
-            print("Invalid announcements URL")
+            errorMessage = "Invalid announcements URL"
             return
         }
 
@@ -54,10 +57,25 @@ class Provider: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
                 isLoadingAnnouncements = false
-                print("Failed to fetch announcements. Status code: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                handleError(
+                    NSError(
+                        domain: "ProviderError", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Invalid response"]),
+                    context: "Failed to fetch announcements")
+                return
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                isLoadingAnnouncements = false
+                handleError(
+                    NSError(
+                        domain: "ProviderError", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "HTTP error"]),
+                    context: "Failed to fetch announcements",
+                    response: httpResponse,
+                    data: data)
                 return
             }
 
@@ -66,11 +84,13 @@ class Provider: ObservableObject {
             let uniqueAnnouncements = deduplicateAnnouncements(decodedAnnouncements)
             self.announcements = uniqueAnnouncements
             saveAnnouncementsToCache(uniqueAnnouncements)
-            print("Successfully fetched \(decodedAnnouncements.count) announcements (\(uniqueAnnouncements.count) unique)")
+            print(
+                "Successfully fetched \(decodedAnnouncements.count) announcements (\(uniqueAnnouncements.count) unique)"
+            )
 
         } catch {
             isLoadingAnnouncements = false
-            print("Error fetching announcements: \(error)")
+            handleError(error, context: "Failed to fetch announcements")
         }
 
         isLoadingAnnouncements = false
@@ -78,22 +98,24 @@ class Provider: ObservableObject {
 
     func fetchAssignments() async {
         isLoadingAssignments = true
+        errorMessage = nil
 
         // Get settings from UserDefaults
         let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget") ?? .standard
         guard let scraperAPIUrl = defaults.string(forKey: "ScraperAPIUrl"),
-              let sessionId = defaults.string(forKey: "SessionID"),
-              !scraperAPIUrl.isEmpty,
-              !sessionId.isEmpty else {
+            let sessionId = defaults.string(forKey: "SessionID"),
+            !scraperAPIUrl.isEmpty,
+            !sessionId.isEmpty
+        else {
             isLoadingAssignments = false
-            print("Missing scraper API URL or session ID")
+            errorMessage = "Missing scraper API URL or session ID in settings"
             return
         }
 
         // Create URL
         guard let url = URL(string: "\(scraperAPIUrl)/assignments") else {
             isLoadingAssignments = false
-            print("Invalid assignments URL")
+            errorMessage = "Invalid assignments URL"
             return
         }
 
@@ -105,10 +127,25 @@ class Provider: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
                 isLoadingAssignments = false
-                print("Failed to fetch assignments. Status code: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                handleError(
+                    NSError(
+                        domain: "ProviderError", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Invalid response"]),
+                    context: "Failed to fetch assignments")
+                return
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                isLoadingAssignments = false
+                handleError(
+                    NSError(
+                        domain: "ProviderError", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "HTTP error"]),
+                    context: "Failed to fetch assignments",
+                    response: httpResponse,
+                    data: data)
                 return
             }
 
@@ -117,11 +154,13 @@ class Provider: ObservableObject {
             let uniqueAssignments = deduplicateAssignments(decodedAssignments)
             self.assignments = uniqueAssignments
             saveAssignmentsToCache(uniqueAssignments)
-            print("Successfully fetched \(decodedAssignments.count) assignments (\(uniqueAssignments.count) unique)")
+            print(
+                "Successfully fetched \(decodedAssignments.count) assignments (\(uniqueAssignments.count) unique)"
+            )
 
         } catch {
             isLoadingAssignments = false
-            print("Error fetching assignments: \(error)")
+            handleError(error, context: "Failed to fetch assignments")
         }
 
         isLoadingAssignments = false
@@ -223,5 +262,50 @@ class Provider: ObservableObject {
         }
 
         return uniqueAssignments
+    }
+
+    // MARK: - Error Handling
+
+    private func handleError(
+        _ error: Error, context: String, response: HTTPURLResponse? = nil, data: Data? = nil
+    ) {
+        // First check if it's a URLError (network timeout, no connection, etc.)
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut:
+                errorMessage = "Timeout: The request timed out. Please try again."
+            case .notConnectedToInternet:
+                errorMessage = "No Internet Connection: Please check your network settings."
+            case .cannotFindHost:
+                errorMessage = "Cannot Find Host: The server could not be reached."
+            default:
+                errorMessage = "Network Error: \(urlError.localizedDescription)"
+            }
+            return
+        }
+
+        // Check for server error with JSON error message
+        if let httpResponse = response, httpResponse.statusCode >= 400 {
+            if let data = data,
+                let errorDict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let serverError = errorDict["error"] as? String
+            {
+                // Server returned an error message in JSON
+                errorMessage = "Server Error: \(serverError)"
+            } else {
+                // Generic server error
+                errorMessage = "Server Error: HTTP \(httpResponse.statusCode)"
+            }
+            return
+        }
+
+        // JSON decoding error
+        if error is DecodingError {
+            errorMessage = "Data Error: Failed to parse server response."
+            return
+        }
+
+        // Generic error
+        errorMessage = "\(context): \(error.localizedDescription)"
     }
 }
