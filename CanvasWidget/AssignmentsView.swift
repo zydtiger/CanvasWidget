@@ -11,7 +11,7 @@ struct AssignmentsView: View {
     @StateObject private var provider = Provider.shared
     @State private var showingLinkAlert = false
     @State private var linkToOpen: URL?
-    
+
     var body: some View {
         ZStack {
             VStack(spacing: 8) {
@@ -20,11 +20,11 @@ struct AssignmentsView: View {
                     Image(systemName: "checkmark.rectangle")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary)
-                    
+
                     Text("Assignments")
                         .font(.title)
                         .fontWeight(.semibold)
-                    
+
                     Text("View your Canvas assignments here")
                         .font(.body)
                         .foregroundColor(.secondary)
@@ -52,14 +52,16 @@ struct AssignmentsView: View {
                         }
                     }
                 }
-                
+
                 // List
                 ScrollView {
                     LazyVStack(spacing: 6) {
-                        let currentAssignments = provider.assignments.isEmpty ? sampleAssignments() : provider.assignments
+                        let currentAssignments =
+                            provider.assignments.isEmpty
+                            ? sampleAssignments() : provider.assignments
                         ForEach(currentAssignments) { assignment in
                             assignmentRow(for: assignment)
-                            
+
                             if assignment.id != currentAssignments.last?.id {
                                 Divider()
                                     .padding(.vertical, 1)
@@ -72,17 +74,17 @@ struct AssignmentsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .disabled(provider.isLoadingAssignments)
             .blur(radius: provider.isLoadingAssignments ? 2 : 0)
-            
+
             // Blocking Modal Progress Overlay
             if provider.isLoadingAssignments {
                 Color.black.opacity(0.2)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 32) {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.5)
-                    
+
                     Text("Loading Assignments...")
                         .font(.headline)
                         .foregroundColor(.white)
@@ -96,7 +98,7 @@ struct AssignmentsView: View {
             }
         }
     }
-    
+
     private func assignmentRow(for assignment: Assignment) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(assignment.title)
@@ -104,14 +106,14 @@ struct AssignmentsView: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
-            
+
             HStack(spacing: 8) {
                 Text(assignment.course)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                
+
                 Spacer()
-                
+
                 Text(assignment.dueDate)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -124,7 +126,7 @@ struct AssignmentsView: View {
             showingLinkAlert = true
         }
         .alert("Open in Browser?", isPresented: $showingLinkAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Open") {
                 if let link = linkToOpen {
                     NSWorkspace.shared.open(link)
@@ -132,6 +134,17 @@ struct AssignmentsView: View {
             }
         } message: {
             Text("Do you want to open this link in your default browser?")
+        }
+        .alert(
+            "Error",
+            isPresented: Binding(
+                get: { provider.errorMessage != nil },
+                set: { _ in provider.errorMessage = nil }
+            )
+        ) {
+            Button("OK") {}
+        } message: {
+            Text(provider.errorMessage ?? "An unknown error occurred")
         }
     }
 }

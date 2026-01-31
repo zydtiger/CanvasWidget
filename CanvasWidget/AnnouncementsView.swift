@@ -5,27 +5,27 @@
 //  Created by Claude on 12/10/25.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct AnnouncementsView: View {
     @StateObject private var provider = Provider.shared
     @State private var showingLinkAlert = false
     @State private var linkToOpen: URL?
-    
+
     var body: some View {
-        ZStack{
+        ZStack {
             VStack(spacing: 0) {
                 // Header
                 VStack(spacing: 16) {
                     Image(systemName: "speaker.wave.2")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary)
-                    
+
                     Text("Announcements")
                         .font(.title)
                         .fontWeight(.semibold)
-                    
+
                     Text("View your Canvas announcements here")
                         .font(.body)
                         .foregroundColor(.secondary)
@@ -53,14 +53,16 @@ struct AnnouncementsView: View {
                         }
                     }
                 }
-                
+
                 // List
                 ScrollView {
                     LazyVStack(spacing: 6) {
-                        let currentAnnouncements = provider.announcements.isEmpty ? sampleAnnouncements() : provider.announcements
+                        let currentAnnouncements =
+                            provider.announcements.isEmpty
+                            ? sampleAnnouncements() : provider.announcements
                         ForEach(currentAnnouncements) { announcement in
                             announcementRow(for: announcement)
-                            
+
                             if announcement.id != currentAnnouncements.last?.id {
                                 Divider()
                                     .padding(.vertical, 1)
@@ -73,17 +75,17 @@ struct AnnouncementsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .disabled(provider.isLoadingAnnouncements)
             .blur(radius: provider.isLoadingAnnouncements ? 2 : 0)
-            
+
             // Blocking Modal Progress Overlay
             if provider.isLoadingAnnouncements {
                 Color.black.opacity(0.2)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 32) {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.5)
-                    
+
                     Text("Loading Announcements...")
                         .font(.headline)
                         .foregroundColor(.white)
@@ -97,7 +99,7 @@ struct AnnouncementsView: View {
             }
         }
     }
-    
+
     private func announcementRow(for announcement: Announcement) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(announcement.title)
@@ -105,14 +107,14 @@ struct AnnouncementsView: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
-            
+
             HStack(spacing: 8) {
                 Text(announcement.course)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                
+
                 Spacer()
-                
+
                 Text(announcement.date)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -125,7 +127,7 @@ struct AnnouncementsView: View {
             showingLinkAlert = true
         }
         .alert("Open in Browser?", isPresented: $showingLinkAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Open") {
                 if let link = linkToOpen {
                     NSWorkspace.shared.open(link)
@@ -133,6 +135,17 @@ struct AnnouncementsView: View {
             }
         } message: {
             Text("Do you want to open this link in your default browser?")
+        }
+        .alert(
+            "Error",
+            isPresented: Binding(
+                get: { provider.errorMessage != nil },
+                set: { _ in provider.errorMessage = nil }
+            )
+        ) {
+            Button("OK") {}
+        } message: {
+            Text(provider.errorMessage ?? "An unknown error occurred")
         }
     }
 }
