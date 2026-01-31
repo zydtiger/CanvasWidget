@@ -1,0 +1,14 @@
+{
+  "editor.tabSize": 4,
+  "files.exclude": {
+    "**/.claude": true,
+    "**/.zed": true,
+    "**/.svn": true,
+    "**/.jj": true,
+    "**/CVS/**": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/.classpath": true,
+    "**/.settings": true
+  }
+}
