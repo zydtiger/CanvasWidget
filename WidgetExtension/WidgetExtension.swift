@@ -17,43 +17,54 @@ struct SimpleEntry: TimelineEntry {
 
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(
+        // Use cached data synchronously for placeholder
+        let announcements = MainActor.assumeIsolated { WidgetDataProvider.getCachedAnnouncements() }
+        let assignments = MainActor.assumeIsolated { WidgetDataProvider.getCachedAssignments() }
+        return SimpleEntry(
             date: Date(),
             configuration: ConfigurationAppIntent(),
-            announcements: sampleAnnouncements(),
-            assignments: sampleAssignments()
+            announcements: announcements,
+            assignments: assignments
         )
     }
-    
+
     func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry {
-        SimpleEntry(
+        // For snapshots, load cached data immediately for preview
+        let announcements = await MainActor.run { WidgetDataProvider.getCachedAnnouncements() }
+        let assignments = await MainActor.run { WidgetDataProvider.getCachedAssignments() }
+        return SimpleEntry(
             date: Date(),
             configuration: configuration,
-            announcements: sampleAnnouncements(),
-            assignments: sampleAssignments()
+            announcements: announcements,
+            assignments: assignments
         )
     }
-    
+
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
-        // Read settings from Shared App Group
-        let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget")
-        let apiUrl = defaults?.string(forKey: "ScraperAPIUrl") ?? "Not set"
-        let sessionId = defaults?.string(forKey: "SessionID") ?? "Not set"
+        // Use refresh methods - loads cache first, fetches if expired
+        let announcements: [Announcement]
+        let assignments: [Assignment]
 
-        print("WidgetExtension Settings:")
-        print("ScraperAPIUrl: \(apiUrl)")
-        print("SessionID: \(sessionId)")
+        switch configuration.contentType {
+        case .announcements:
+            announcements = await WidgetDataProvider.refreshAnnouncements()
+            assignments = await MainActor.run { WidgetDataProvider.getCachedAssignments() }
+        case .assignments:
+            assignments = await WidgetDataProvider.refreshAssignments()
+            announcements = await MainActor.run { WidgetDataProvider.getCachedAnnouncements() }
+        }
 
-        // Generate a single timeline entry for the current date.
+        // Generate timeline entry for current date
         let now = Date()
         let entry = SimpleEntry(
             date: now,
             configuration: configuration,
-            announcements: sampleAnnouncements(),
-            assignments: sampleAssignments()
+            announcements: announcements,
+            assignments: assignments
         )
-        
-        let nextRefreshDate = Calendar.current.date(byAdding: .minute, value: 15, to: now)!
+
+        // Update every hour (60 minutes)
+        let nextRefreshDate = Calendar.current.date(byAdding: .hour, value: 1, to: now) ?? now
         return Timeline(entries: [entry], policy: .after(nextRefreshDate))
     }
 }
@@ -265,3 +276,4 @@ struct WidgetExtension: Widget {
         }
     }
 }
+
