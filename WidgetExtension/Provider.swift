@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UserNotifications
 
 // MARK: - Data Provider for Widget
 
@@ -100,12 +101,12 @@ struct WidgetDataProvider {
     /// Fetches announcements from API and saves to cache
     private static func fetchAnnouncements(defaults: UserDefaults) async -> [Announcement]? {
         guard let (url, sessionId) = getSettings() else {
-            print("WidgetProvider: Missing settings")
+            sendErrorNotification(title: "CanvasWidget Error", body: "Missing API settings")
             return nil
         }
 
         guard let apiUrl = URL(string: "\(url)/announcements") else {
-            print("WidgetProvider: Invalid URL")
+            sendErrorNotification(title: "CanvasWidget Error", body: "Invalid API URL")
             return nil
         }
 
@@ -118,7 +119,7 @@ struct WidgetDataProvider {
             print("WidgetProvider: Fetched \(unique.count) announcements")
             return unique
         case .failure(let error):
-            print("WidgetProvider: Fetch error - \(error.localizedDescription)")
+            handleFetchError(error, context: "Failed to fetch announcements")
             return nil
         }
     }
@@ -126,12 +127,12 @@ struct WidgetDataProvider {
     /// Fetches assignments from API and saves to cache
     private static func fetchAssignments(defaults: UserDefaults) async -> [Assignment]? {
         guard let (url, sessionId) = getSettings() else {
-            print("WidgetProvider: Missing settings")
+            sendErrorNotification(title: "CanvasWidget Error", body: "Missing API settings")
             return nil
         }
 
         guard let apiUrl = URL(string: "\(url)/assignments") else {
-            print("WidgetProvider: Invalid URL")
+            sendErrorNotification(title: "CanvasWidget Error", body: "Invalid API URL")
             return nil
         }
 
@@ -144,7 +145,7 @@ struct WidgetDataProvider {
             print("WidgetProvider: Fetched \(unique.count) assignments")
             return unique
         case .failure(let error):
-            print("WidgetProvider: Fetch error - \(error.localizedDescription)")
+            handleFetchError(error, context: "Failed to fetch assignments")
             return nil
         }
     }
@@ -255,5 +256,50 @@ struct WidgetDataProvider {
             let id = String(describing: item.id)
             return seen.insert(id).inserted
         }
+    }
+
+    // MARK: - Notifications (Private)
+
+    /// Sends a macOS notification for widget fetch errors
+    private static func sendErrorNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil // Immediate delivery
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("WidgetProvider: Failed to send notification - \(error)")
+            }
+        }
+    }
+
+    /// Handles fetch errors with user-friendly messages and notification
+    private static func handleFetchError(_ error: Error, context: String) {
+        let message: String
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut:
+                message = "Request timed out. Please try again."
+            case .notConnectedToInternet:
+                message = "No internet connection."
+            case .cannotFindHost:
+                message = "Cannot reach server."
+            default:
+                message = urlError.localizedDescription
+            }
+        } else {
+            message = error.localizedDescription
+        }
+
+        print("WidgetProvider: \(context) - \(message)")
+        sendErrorNotification(title: "CanvasWidget Error", body: "\(context): \(message)")
     }
 }
