@@ -7,6 +7,7 @@
 
 import Combine
 import Foundation
+import UserNotifications
 
 @MainActor
 class Provider: ObservableObject {
@@ -21,13 +22,16 @@ class Provider: ObservableObject {
     private let defaults = UserDefaults(suiteName: "group.com.custom.CanvasWidget") ?? .standard
     private let announcementsKey = "CachedAnnouncements"
     private let assignmentsKey = "CachedAssignments"
+    private let announcementsTimestampKey = "CachedAnnouncementsTimestamp"
+    private let assignmentsTimestampKey = "CachedAssignmentsTimestamp"
+    private let cacheTTL: TimeInterval = 3600  // 1 hour
 
-    private init() {
-        loadCachedData()
-    }
+    // MARK: - URL Fetches
 
-    func fetchAnnouncements() async {
-        isLoadingAnnouncements = true
+    func fetchAnnouncements(showLoading: Bool = true) async {
+        if showLoading {
+            isLoadingAnnouncements = true
+        }
         errorMessage = nil
 
         // Get settings from UserDefaults
@@ -37,14 +41,18 @@ class Provider: ObservableObject {
             !scraperAPIUrl.isEmpty,
             !sessionId.isEmpty
         else {
-            isLoadingAnnouncements = false
+            if showLoading {
+                isLoadingAnnouncements = false
+            }
             errorMessage = "Missing scraper API URL or session ID in settings"
             return
         }
 
         // Create URL
         guard let url = URL(string: "\(scraperAPIUrl)/announcements") else {
-            isLoadingAnnouncements = false
+            if showLoading {
+                isLoadingAnnouncements = false
+            }
             errorMessage = "Invalid announcements URL"
             return
         }
@@ -58,24 +66,30 @@ class Provider: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                isLoadingAnnouncements = false
+                if showLoading {
+                    isLoadingAnnouncements = false
+                }
                 handleError(
                     NSError(
                         domain: "ProviderError", code: -1,
                         userInfo: [NSLocalizedDescriptionKey: "Invalid response"]),
-                    context: "Failed to fetch announcements")
+                    context: "Failed to fetch announcements",
+                    isBackground: !showLoading)
                 return
             }
 
             guard httpResponse.statusCode == 200 else {
-                isLoadingAnnouncements = false
+                if showLoading {
+                    isLoadingAnnouncements = false
+                }
                 handleError(
                     NSError(
                         domain: "ProviderError", code: -1,
                         userInfo: [NSLocalizedDescriptionKey: "HTTP error"]),
                     context: "Failed to fetch announcements",
                     response: httpResponse,
-                    data: data)
+                    data: data,
+                    isBackground: !showLoading)
                 return
             }
 
@@ -89,15 +103,21 @@ class Provider: ObservableObject {
             )
 
         } catch {
-            isLoadingAnnouncements = false
-            handleError(error, context: "Failed to fetch announcements")
+            if showLoading {
+                isLoadingAnnouncements = false
+            }
+            handleError(error, context: "Failed to fetch announcements", isBackground: !showLoading)
         }
 
-        isLoadingAnnouncements = false
+        if showLoading {
+            isLoadingAnnouncements = false
+        }
     }
 
-    func fetchAssignments() async {
-        isLoadingAssignments = true
+    func fetchAssignments(showLoading: Bool = true) async {
+        if showLoading {
+            isLoadingAssignments = true
+        }
         errorMessage = nil
 
         // Get settings from UserDefaults
@@ -107,14 +127,18 @@ class Provider: ObservableObject {
             !scraperAPIUrl.isEmpty,
             !sessionId.isEmpty
         else {
-            isLoadingAssignments = false
+            if showLoading {
+                isLoadingAssignments = false
+            }
             errorMessage = "Missing scraper API URL or session ID in settings"
             return
         }
 
         // Create URL
         guard let url = URL(string: "\(scraperAPIUrl)/assignments") else {
-            isLoadingAssignments = false
+            if showLoading {
+                isLoadingAssignments = false
+            }
             errorMessage = "Invalid assignments URL"
             return
         }
@@ -128,24 +152,30 @@ class Provider: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                isLoadingAssignments = false
+                if showLoading {
+                    isLoadingAssignments = false
+                }
                 handleError(
                     NSError(
                         domain: "ProviderError", code: -1,
                         userInfo: [NSLocalizedDescriptionKey: "Invalid response"]),
-                    context: "Failed to fetch assignments")
+                    context: "Failed to fetch assignments",
+                    isBackground: !showLoading)
                 return
             }
 
             guard httpResponse.statusCode == 200 else {
-                isLoadingAssignments = false
+                if showLoading {
+                    isLoadingAssignments = false
+                }
                 handleError(
                     NSError(
                         domain: "ProviderError", code: -1,
                         userInfo: [NSLocalizedDescriptionKey: "HTTP error"]),
                     context: "Failed to fetch assignments",
                     response: httpResponse,
-                    data: data)
+                    data: data,
+                    isBackground: !showLoading)
                 return
             }
 
@@ -159,52 +189,91 @@ class Provider: ObservableObject {
             )
 
         } catch {
-            isLoadingAssignments = false
-            handleError(error, context: "Failed to fetch assignments")
+            if showLoading {
+                isLoadingAssignments = false
+            }
+            handleError(error, context: "Failed to fetch assignments", isBackground: !showLoading)
         }
 
-        isLoadingAssignments = false
+        if showLoading {
+            isLoadingAssignments = false
+        }
     }
 
     // MARK: - Caching Methods
 
-    private func loadCachedData() {
-        if let cachedAnnouncements = getCachedAnnouncements() {
-            self.announcements = cachedAnnouncements
-            print("Loaded \(cachedAnnouncements.count) cached announcements")
-        }
+    private func getCachedAnnouncements() -> (data: [Announcement], isExpired: Bool) {
+        guard let data = defaults.data(forKey: announcementsKey) else { return ([], true) }
 
-        if let cachedAssignments = getCachedAssignments() {
-            self.assignments = cachedAssignments
-            print("Loaded \(cachedAssignments.count) cached assignments")
-        }
-    }
+        let timestamp = defaults.double(forKey: announcementsTimestampKey)
+        let isExpired = timestamp == 0 || (Date().timeIntervalSince1970 - timestamp) > cacheTTL
 
-    private func getCachedAnnouncements() -> [Announcement]? {
-        guard let data = defaults.data(forKey: announcementsKey) else { return nil }
         do {
-            return try JSONDecoder().decode([Announcement].self, from: data)
+            return (try JSONDecoder().decode([Announcement].self, from: data), isExpired)
         } catch {
             print("Error decoding cached announcements: \(error)")
-            return nil
+            return ([], true)
         }
     }
 
-    private func getCachedAssignments() -> [Assignment]? {
-        guard let data = defaults.data(forKey: assignmentsKey) else { return nil }
+    private func getCachedAssignments() -> (data: [Assignment], isExpired: Bool) {
+        guard let data = defaults.data(forKey: assignmentsKey) else { return ([], true) }
+
+        let timestamp = defaults.double(forKey: assignmentsTimestampKey)
+        let isExpired = timestamp == 0 || (Date().timeIntervalSince1970 - timestamp) > cacheTTL
+
         do {
-            return try JSONDecoder().decode([Assignment].self, from: data)
+            return (try JSONDecoder().decode([Assignment].self, from: data), isExpired)
         } catch {
             print("Error decoding cached assignments: \(error)")
-            return nil
+            return ([], true)
         }
     }
+
+    // MARK: - Background Refresh
+
+    /// Refreshes announcements in background without blocking UI
+    /// - Loads from cache first for immediate display
+    /// - Fetches fresh data silently if cache is expired
+    func refreshAnnouncementsInBackground() async {
+        let (cached, isExpired) = getCachedAnnouncements()
+
+        // Always load cached data first for immediate UI update
+        if !cached.isEmpty {
+            self.announcements = cached
+            print("Loaded \(cached.count) cached announcements (expired: \(isExpired))")
+        }
+
+        // Fetch fresh data silently if expired
+        if isExpired || cached.isEmpty {
+            await fetchAnnouncements(showLoading: false)
+        }
+    }
+
+    /// Refreshes assignments in background without blocking UI
+    func refreshAssignmentsInBackground() async {
+        let (cached, isExpired) = getCachedAssignments()
+
+        // Always load cached data first for immediate UI update
+        if !cached.isEmpty {
+            self.assignments = cached
+            print("Loaded \(cached.count) cached assignments (expired: \(isExpired))")
+        }
+
+        // Fetch fresh data silently if expired
+        if isExpired || cached.isEmpty {
+            await fetchAssignments(showLoading: false)
+        }
+    }
+
+    // MARK: - Saving to Cache
 
     private func saveAnnouncementsToCache(_ announcements: [Announcement]) {
         do {
             let data = try JSONEncoder().encode(announcements)
             defaults.set(data, forKey: announcementsKey)
-            print("Saved \(announcements.count) announcements to cache")
+            defaults.set(Date().timeIntervalSince1970, forKey: announcementsTimestampKey)
+            print("Saved \(announcements.count) announcements to cache with timestamp")
         } catch {
             print("Error encoding announcements for cache: \(error)")
         }
@@ -214,7 +283,8 @@ class Provider: ObservableObject {
         do {
             let data = try JSONEncoder().encode(assignments)
             defaults.set(data, forKey: assignmentsKey)
-            print("Saved \(assignments.count) assignments to cache")
+            defaults.set(Date().timeIntervalSince1970, forKey: assignmentsTimestampKey)
+            print("Saved \(assignments.count) assignments to cache with timestamp")
         } catch {
             print("Error encoding assignments for cache: \(error)")
         }
@@ -264,22 +334,55 @@ class Provider: ObservableObject {
         return uniqueAssignments
     }
 
+    // MARK: - Notifications
+
+    /// Sends a macOS notification for background fetch errors
+    private func sendNotification(title: String, body: String) {
+        let notification = UNMutableNotificationContent()
+        notification.title = title
+        notification.body = body
+        notification.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: notification,
+            trigger: nil  // Immediate delivery
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Failed to send notification: \(error)")
+            }
+        }
+    }
+
     // MARK: - Error Handling
 
     private func handleError(
-        _ error: Error, context: String, response: HTTPURLResponse? = nil, data: Data? = nil
+        _ error: Error, context: String, response: HTTPURLResponse? = nil, data: Data? = nil,
+        isBackground: Bool = false
     ) {
+        let message: String
+
         // First check if it's a URLError (network timeout, no connection, etc.)
         if let urlError = error as? URLError {
             switch urlError.code {
             case .timedOut:
-                errorMessage = "Timeout: The request timed out. Please try again."
+                message = "Timeout: The request timed out. Please try again."
             case .notConnectedToInternet:
-                errorMessage = "No Internet Connection: Please check your network settings."
+                message = "No Internet Connection: Please check your network settings."
             case .cannotFindHost:
-                errorMessage = "Cannot Find Host: The server could not be reached."
+                message = "Cannot Find Host: The server could not be reached."
             default:
-                errorMessage = "Network Error: \(urlError.localizedDescription)"
+                message = "Network Error: \(urlError.localizedDescription)"
+            }
+
+            // Always set errorMessage for alert dialog
+            errorMessage = message
+
+            // Send notification for background errors
+            if isBackground {
+                sendNotification(title: "CanvasWidget Error", body: message)
             }
             return
         }
@@ -291,21 +394,37 @@ class Provider: ObservableObject {
                 let serverError = errorDict["error"] as? String
             {
                 // Server returned an error message in JSON
-                errorMessage = "Server Error: \(serverError)"
+                message = "Server Error: \(serverError)"
             } else {
                 // Generic server error
-                errorMessage = "Server Error: HTTP \(httpResponse.statusCode)"
+                message = "Server Error: HTTP \(httpResponse.statusCode)"
+            }
+
+            errorMessage = message
+
+            if isBackground {
+                sendNotification(title: "CanvasWidget Error", body: message)
             }
             return
         }
 
         // JSON decoding error
         if error is DecodingError {
-            errorMessage = "Data Error: Failed to parse server response."
+            message = "Data Error: Failed to parse server response."
+            errorMessage = message
+
+            if isBackground {
+                sendNotification(title: "CanvasWidget Error", body: message)
+            }
             return
         }
 
         // Generic error
-        errorMessage = "\(context): \(error.localizedDescription)"
+        message = "\(context): \(error.localizedDescription)"
+        errorMessage = message
+
+        if isBackground {
+            sendNotification(title: "CanvasWidget Error", body: message)
+        }
     }
 }

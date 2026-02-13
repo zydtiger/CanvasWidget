@@ -74,6 +74,9 @@ struct AssignmentsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .disabled(provider.isLoadingAssignments)
             .blur(radius: provider.isLoadingAssignments ? 2 : 0)
+            .task {
+                await provider.refreshAssignmentsInBackground()
+            }
 
             // Blocking Modal Progress Overlay
             if provider.isLoadingAssignments {

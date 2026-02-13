@@ -6,13 +6,29 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct CanvasWidgetApp: App {
+    init() {
+        requestNotificationAuthorization()
+    }
+
     var body: some Scene {
         WindowGroup {
             EntryView()
         }
         .defaultSize(width: 800, height: 600)
+    }
+
+    /// Request notification authorization on app launch
+    private func requestNotificationAuthorization() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if granted {
+                print("Notification authorization granted")
+            } else if let error = error {
+                print("Notification authorization error: \(error)")
+            }
+        }
     }
 }

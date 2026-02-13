@@ -75,6 +75,9 @@ struct AnnouncementsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .disabled(provider.isLoadingAnnouncements)
             .blur(radius: provider.isLoadingAnnouncements ? 2 : 0)
+            .task {
+                await provider.refreshAnnouncementsInBackground()
+            }
 
             // Blocking Modal Progress Overlay
             if provider.isLoadingAnnouncements {
