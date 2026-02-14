@@ -5,6 +5,7 @@
 //  Created by Zhiyuan Ding on 11/27/25.
 //
 
+import AppKit
 import SwiftUI
 import UserNotifications
 
@@ -17,6 +18,10 @@ struct CanvasWidgetApp: App {
     var body: some Scene {
         WindowGroup {
             EntryView()
+                .onOpenURL { url in
+                    // Handle URL from widget clicks - open in default browser
+                    NSWorkspace.shared.open(url)
+                }
         }
         .defaultSize(width: 800, height: 600)
     }
