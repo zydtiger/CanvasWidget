@@ -8,11 +8,13 @@
 import AppKit
 import SwiftUI
 import UserNotifications
+import WidgetKit
 
 @main
 struct CanvasWidgetApp: App {
     init() {
         requestNotificationAuthorization()
+        refreshAllWidgets()
     }
 
     var body: some Scene {
@@ -35,5 +37,11 @@ struct CanvasWidgetApp: App {
                 print("Notification authorization error: \(error)")
             }
         }
+    }
+
+    /// Refresh all widgets on app launch
+    private func refreshAllWidgets() {
+        WidgetCenter.shared.reloadAllTimelines()
+        print("Refreshed all widget timelines")
     }
 }
