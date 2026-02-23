@@ -30,24 +30,25 @@ struct WidgetDataProvider {
 
     /// Refreshes announcements - loads cache first, fetches from API if expired
     /// - Returns: Cached data (immediate) or fresh data (if fetch succeeds)
+    /// - Note: Empty array is valid data (no announcements), only fetch if cache is expired or missing
     static func refreshAnnouncements() async -> [Announcement] {
         guard let defaults = UserDefaults(suiteName: appGroup) else {
             print("WidgetProvider: Failed to access App Group defaults")
             return []
         }
 
-        let (cached, isExpired) = getCachedAnnouncementsWithExpiry(defaults)
+        let (cached, isExpired, hasCache) = getCachedAnnouncementsWithExpiry(defaults)
 
-        if !cached.isEmpty {
+        if hasCache {
             print("WidgetProvider: Loaded \(cached.count) cached announcements (expired: \(isExpired))")
         }
 
-        // Return cached immediately if fresh
-        guard isExpired || cached.isEmpty else {
+        // Return cached immediately if fresh (even if empty - empty is valid data)
+        guard isExpired else {
             return cached
         }
 
-        // Fetch fresh data if expired or empty
+        // Fetch fresh data if expired
         guard let fresh = await fetchAnnouncements(defaults: defaults) else {
             return cached
         }
@@ -57,24 +58,25 @@ struct WidgetDataProvider {
 
     /// Refreshes assignments - loads cache first, fetches from API if expired
     /// - Returns: Cached data (immediate) or fresh data (if fetch succeeds)
+    /// - Note: Empty array is valid data (no assignments), only fetch if cache is expired or missing
     static func refreshAssignments() async -> [Assignment] {
         guard let defaults = UserDefaults(suiteName: appGroup) else {
             print("WidgetProvider: Failed to access App Group defaults")
             return []
         }
 
-        let (cached, isExpired) = getCachedAssignmentsWithExpiry(defaults)
+        let (cached, isExpired, hasCache) = getCachedAssignmentsWithExpiry(defaults)
 
-        if !cached.isEmpty {
+        if hasCache {
             print("WidgetProvider: Loaded \(cached.count) cached assignments (expired: \(isExpired))")
         }
 
-        // Return cached immediately if fresh
-        guard isExpired || cached.isEmpty else {
+        // Return cached immediately if fresh (even if empty - empty is valid data)
+        guard isExpired else {
             return cached
         }
 
-        // Fetch fresh data if expired or empty
+        // Fetch fresh data if expired
         guard let fresh = await fetchAssignments(defaults: defaults) else {
             return cached
         }
@@ -152,30 +154,32 @@ struct WidgetDataProvider {
 
     // MARK: - Get Cached with Expiry (Private)
 
-    /// Returns cached announcements and expiry status
-    private static func getCachedAnnouncementsWithExpiry(_ defaults: UserDefaults) -> (data: [Announcement], isExpired: Bool) {
+    /// Returns cached announcements, expiry status, and whether cache exists
+    /// - Note: Empty array is valid data (no announcements), hasCache=true indicates data was intentionally saved
+    private static func getCachedAnnouncementsWithExpiry(_ defaults: UserDefaults) -> (data: [Announcement], isExpired: Bool, hasCache: Bool) {
+        guard let data = defaults.data(forKey: announcementsKey),
+              let announcements = try? JSONDecoder().decode([Announcement].self, from: data) else {
+            return ([], true, false)
+        }
+
         let timestamp = defaults.double(forKey: announcementsTimestampKey)
         let isExpired = timestamp == 0 || (Date().timeIntervalSince1970 - timestamp) > cacheTTL
 
-        guard let data = defaults.data(forKey: announcementsKey),
-              let announcements = try? JSONDecoder().decode([Announcement].self, from: data) else {
-            return ([], true)
-        }
-
-        return (announcements, isExpired)
+        return (announcements, isExpired, true)
     }
 
-    /// Returns cached assignments and expiry status
-    private static func getCachedAssignmentsWithExpiry(_ defaults: UserDefaults) -> (data: [Assignment], isExpired: Bool) {
+    /// Returns cached assignments, expiry status, and whether cache exists
+    /// - Note: Empty array is valid data (no assignments), hasCache=true indicates data was intentionally saved
+    private static func getCachedAssignmentsWithExpiry(_ defaults: UserDefaults) -> (data: [Assignment], isExpired: Bool, hasCache: Bool) {
+        guard let data = defaults.data(forKey: assignmentsKey),
+              let assignments = try? JSONDecoder().decode([Assignment].self, from: data) else {
+            return ([], true, false)
+        }
+
         let timestamp = defaults.double(forKey: assignmentsTimestampKey)
         let isExpired = timestamp == 0 || (Date().timeIntervalSince1970 - timestamp) > cacheTTL
 
-        guard let data = defaults.data(forKey: assignmentsKey),
-              let assignments = try? JSONDecoder().decode([Assignment].self, from: data) else {
-            return ([], true)
-        }
-
-        return (assignments, isExpired)
+        return (assignments, isExpired, true)
     }
 
     // MARK: - Save to Cache (Private)
