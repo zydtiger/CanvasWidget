@@ -57,8 +57,8 @@ struct AssignmentsView: View {
                 ScrollView {
                     LazyVStack(spacing: 6) {
                         let currentAssignments =
-                            provider.assignments.isEmpty
-                            ? sampleAssignments() : provider.assignments
+                            provider.hasLoadedAssignments
+                            ? provider.assignments : sampleAssignments()
                         ForEach(currentAssignments) { assignment in
                             assignmentRow(for: assignment)
 

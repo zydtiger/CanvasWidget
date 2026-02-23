@@ -58,8 +58,8 @@ struct AnnouncementsView: View {
                 ScrollView {
                     LazyVStack(spacing: 6) {
                         let currentAnnouncements =
-                            provider.announcements.isEmpty
-                            ? sampleAnnouncements() : provider.announcements
+                            provider.hasLoadedAnnouncements
+                            ? provider.announcements : sampleAnnouncements()
                         ForEach(currentAnnouncements) { announcement in
                             announcementRow(for: announcement)
 

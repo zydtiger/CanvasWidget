@@ -15,6 +15,8 @@ class Provider: ObservableObject {
 
     @Published var announcements: [Announcement] = []
     @Published var assignments: [Assignment] = []
+    @Published var hasLoadedAnnouncements = false
+    @Published var hasLoadedAssignments = false
     @Published var isLoadingAnnouncements = false
     @Published var isLoadingAssignments = false
     @Published var errorMessage: String?
@@ -97,6 +99,7 @@ class Provider: ObservableObject {
             let decodedAnnouncements = try JSONDecoder().decode([Announcement].self, from: data)
             let uniqueAnnouncements = deduplicateAnnouncements(decodedAnnouncements)
             self.announcements = uniqueAnnouncements
+            self.hasLoadedAnnouncements = true
             saveAnnouncementsToCache(uniqueAnnouncements)
             print(
                 "Successfully fetched \(decodedAnnouncements.count) announcements (\(uniqueAnnouncements.count) unique)"
@@ -183,6 +186,7 @@ class Provider: ObservableObject {
             let decodedAssignments = try JSONDecoder().decode([Assignment].self, from: data)
             let uniqueAssignments = deduplicateAssignments(decodedAssignments)
             self.assignments = uniqueAssignments
+            self.hasLoadedAssignments = true
             saveAssignmentsToCache(uniqueAssignments)
             print(
                 "Successfully fetched \(decodedAssignments.count) assignments (\(uniqueAssignments.count) unique)"
@@ -238,14 +242,15 @@ class Provider: ObservableObject {
     func refreshAnnouncementsInBackground() async {
         let (cached, isExpired) = getCachedAnnouncements()
 
-        // Always load cached data first for immediate UI update
-        if !cached.isEmpty {
+        // Load cached data if it exists (even if empty - empty is valid data)
+        if let data = defaults.data(forKey: announcementsKey) {
             self.announcements = cached
+            self.hasLoadedAnnouncements = true
             print("Loaded \(cached.count) cached announcements (expired: \(isExpired))")
         }
 
-        // Fetch fresh data silently if expired
-        if isExpired || cached.isEmpty {
+        // Fetch fresh data silently if expired or no cache exists
+        if isExpired {
             await fetchAnnouncements(showLoading: false)
         }
     }
@@ -254,14 +259,15 @@ class Provider: ObservableObject {
     func refreshAssignmentsInBackground() async {
         let (cached, isExpired) = getCachedAssignments()
 
-        // Always load cached data first for immediate UI update
-        if !cached.isEmpty {
+        // Load cached data if it exists (even if empty - empty is valid data)
+        if let data = defaults.data(forKey: assignmentsKey) {
             self.assignments = cached
+            self.hasLoadedAssignments = true
             print("Loaded \(cached.count) cached assignments (expired: \(isExpired))")
         }
 
-        // Fetch fresh data silently if expired
-        if isExpired || cached.isEmpty {
+        // Fetch fresh data silently if expired or no cache exists
+        if isExpired {
             await fetchAssignments(showLoading: false)
         }
     }
